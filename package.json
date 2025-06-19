@@ -1,0 +1,76 @@
+{
+  "name": "@relayplane/sdk",
+  "version": "0.1.0",
+  "description": "RelayPlane SDK for AI model routing and agent orchestration with fallback, optimization, and cost control",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
+    "build:cjs": "esbuild src/index.ts --bundle --platform=node --target=node16 --outfile=dist/index.js --format=cjs --external:node:*",
+    "build:esm": "esbuild src/index.ts --bundle --platform=node --target=node16 --outfile=dist/index.esm.js --format=esm --external:node:*",
+    "build:types": "tsc --emitDeclarationOnly --outDir dist",
+    "dev": "npm run build -- --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "prepublishOnly": "npm run build && npm test",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "relay",
+    "routing",
+    "fallback",
+    "optimization",
+    "claude",
+    "gpt",
+    "gemini",
+    "agents",
+    "orchestration"
+  ],
+  "author": "RelayPlane Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RelayPlane/sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RelayPlane/sdk/issues"
+  },
+  "homepage": "https://relayplane.com",
+  "files": [
+    "dist/**/*",
+    "examples/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "esbuild": "^0.19.0",
+    "eslint": "^8.50.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+} 
