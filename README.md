@@ -22,7 +22,7 @@ const result = await relay
   .with("openai:gpt-4o")
   .prompt("Write a blog post about {{input.topic}}")
   .step("review")
-  .with("anthropic:claude-3.5-sonnet")
+  .with("anthropic:claude-3-5-sonnet-20241022")
   .prompt("Improve this draft for clarity and engagement")
   .depends("draft")
   .run({ topic: "AI workflows" });
@@ -39,7 +39,7 @@ That's it. Runs locally with your API keys. No gateway. No surprises.
 .with("openai:gpt-4o")
 
 // Anthropic
-.with("anthropic:claude-3.5-sonnet")
+.with("anthropic:claude-3-5-sonnet-20241022")
 
 // Google
 .with("google:gemini-1.5-pro")
@@ -84,18 +84,18 @@ const InvoiceSchema = z.object({
 const result = await relay
   .workflow("invoice-processor")
 
-  // Step 1: Extract structured data
+  // Step 1: Extract structured data (gpt-4o has vision built-in)
   .step("extract", {
     schema: InvoiceSchema,
     systemPrompt: "Extract all invoice fields as structured JSON.",
   })
-  .with("openai:gpt-4o-vision")
+  .with("openai:gpt-4o")
 
   // Step 2: Validate with a different model
   .step("validate", {
     systemPrompt: "Verify totals and flag discrepancies.",
   })
-  .with("anthropic:claude-3.5-sonnet")
+  .with("anthropic:claude-3-5-sonnet-20241022")
   .depends("extract")
 
   // Step 3: Generate summary
@@ -140,7 +140,7 @@ const result = await relay
 
   // AI step: Generate personalized outreach
   .step("outreach")
-  .with("anthropic:claude-3.5-sonnet")
+  .with("anthropic:claude-3-5-sonnet-20241022")
   .prompt("Write a personalized email using this CRM data: {{steps.lookup}}")
   .depends("lookup")
 
@@ -186,11 +186,13 @@ await relay
 
 | Provider | Example Models | Format |
 |----------|----------------|--------|
-| **OpenAI** | GPT-4o, GPT-4o-mini, GPT-4 Turbo | `openai:gpt-4o` |
-| **Anthropic** | Claude 3.5 Sonnet, Claude 3 Opus | `anthropic:claude-3.5-sonnet` |
-| **Google** | Gemini 1.5 Pro, Gemini 1.5 Flash | `google:gemini-1.5-pro` |
+| **OpenAI** | GPT-4o, GPT-4o-mini | `openai:gpt-4o` |
+| **Anthropic** | Claude 3.5 Sonnet, Claude 3.5 Haiku | `anthropic:claude-3-5-sonnet-20241022` |
+| **Google** | Gemini 2.0 Flash, Gemini 2.5 Pro | `google:gemini-2.0-flash` |
 | **xAI** | Grok Beta | `xai:grok-beta` |
 | **Local** | Any Ollama model | `local:llama3.2` |
+
+> **Note:** Use exact model IDs from each provider. RelayPlane passes these directly to provider APIs without modification.
 
 ## API Reference
 
@@ -232,6 +234,40 @@ result.steps          // { stepName: output, ... }
 result.finalOutput    // Last step's output
 result.error          // { message, stepName, cause }
 result.metadata       // { workflowName, startTime, endTime, duration }
+```
+
+### Error Handling
+
+```typescript
+const result = await relay
+  .workflow("example")
+  .step("process").with("openai:gpt-4o")
+  .run(input);
+
+if (!result.success) {
+  console.error(`Failed at step: ${result.error.stepName}`);
+  console.error(result.error.message);
+}
+```
+
+### TypeScript: Typed Results with Schemas
+
+```typescript
+import { z } from "zod";
+
+const UserSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+});
+
+const result = await relay
+  .workflow("extract-user")
+  .step("extract", { schema: UserSchema })
+  .with("openai:gpt-4o")
+  .run({ text: "Contact: John at john@example.com" });
+
+// result.steps.extract is typed as { name: string; email: string }
+console.log(result.steps.extract.name);
 ```
 
 ## Cloud Features (Optional)
