@@ -204,7 +204,7 @@ export interface WorkflowBuilder<Steps extends StepDefinition[] = []> {
    * })
    * ```
    */
-  step<Name extends string, Config extends StepConfig = {}>(
+  step<Name extends string, Config extends StepConfig = Record<string, never>>(
     name: Name,
     config?: Config
   ): StepWith<Name, Config, Steps>;

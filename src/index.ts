@@ -15,9 +15,9 @@
  *     schema: InvoiceSchema,
  *     systemPrompt: 'Extract invoice data'
  *   })
- *   .with('openai:gpt-4o-vision')
+ *   .with('openai:gpt-4.1')
  *   .step('summarize')
- *   .with('anthropic:claude-3.5-sonnet')
+ *   .with('anthropic:claude-sonnet-4-5-20250929')
  *   .depends('extract')
  *   .run({ fileUrl: 'https://example.com/invoice.pdf' });
  * ```
@@ -93,9 +93,9 @@ export type { WorkflowRunResult } from '@relayplane/engine';
  *     schema: InvoiceSchema,
  *     systemPrompt: 'Extract invoice data'
  *   })
- *   .with('openai:gpt-4o-vision')
+ *   .with('openai:gpt-4.1')
  *   .step('summarize')
- *   .with('anthropic:claude-3.5-sonnet')
+ *   .with('anthropic:claude-sonnet-4-5-20250929')
  *   .depends('extract')
  *   .run({ fileUrl: 'https://example.com/invoice.pdf' });
  * ```

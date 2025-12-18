@@ -56,7 +56,7 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
   /**
    * Adds a new step to the workflow.
    */
-  step<Name extends string, Config extends StepConfig = {}>(
+  step<Name extends string, Config extends StepConfig = Record<string, never>>(
     name: Name,
     config?: Config
   ): StepWith<Name, Config, Steps> {

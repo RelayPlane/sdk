@@ -14,18 +14,34 @@
  * @packageDocumentation
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import type { GlobalConfig, ProviderConfig, RunOptions } from './v3-types';
 import { SDKTelemetryClient } from './telemetry/client';
 
 /**
+ * Check if we're running in a Node.js environment (not browser).
+ */
+const isNode = typeof process !== 'undefined' && process.versions?.node;
+
+/**
  * Reads the CLI config file to get the access token.
  * CLI stores config at ~/.relay/config.json after `relay login`.
+ * Only works in Node.js environments - returns undefined in browser.
  */
 function readCliConfig(): { accessToken?: string; teamId?: string } | undefined {
+  // Skip in browser environments
+  if (!isNode) {
+    return undefined;
+  }
+
   try {
+    // Use eval to hide require from bundler static analysis
+    // This prevents bundlers from trying to polyfill Node.js built-ins
+    // eslint-disable-next-line no-eval
+    const nodeRequire = eval('require');
+    const fs = nodeRequire('fs');
+    const path = nodeRequire('path');
+    const os = nodeRequire('os');
+
     const configPath = process.env.RELAY_CONFIG_PATH || path.join(os.homedir(), '.relay', 'config.json');
     if (!fs.existsSync(configPath)) {
       return undefined;

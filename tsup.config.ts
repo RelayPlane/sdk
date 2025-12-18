@@ -5,7 +5,7 @@ const commonOptions: Options = {
   dts: false, // Using tsc for more accurate DTS generation
   sourcemap: true,
   clean: true,
-  shims: true,
+  shims: false, // Disable shims to avoid createRequire in browser
   noExternal: [
     '@relayplane/engine',
     '@relayplane/adapters',
@@ -16,7 +16,13 @@ const commonOptions: Options = {
     '@anthropic-ai/sdk',
     '@google/generative-ai',
     'openai',
-    'zod'
+    'zod',
+    // Mark Node.js built-ins as external to avoid bundling
+    'fs',
+    'path',
+    'os',
+    'module',
+    'url'
   ],
   splitting: false,
   treeshake: true,
@@ -32,8 +38,6 @@ export default defineConfig([
     ...commonOptions,
     format: ['esm'],
     clean: false,
-    banner: {
-      js: `import { createRequire } from 'module';const require = createRequire(import.meta.url);`,
-    },
+    // No banner needed - we handle require dynamically in the code
   },
 ]);
