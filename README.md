@@ -213,6 +213,40 @@ relay
   .run(input, options?)       // Execute
 ```
 
+### Builder Chain Order
+
+The SDK uses phantom types for compile-time safety. This means methods must be called in a specific order:
+
+**AI Steps:**
+```
+.step() → .with() → [.prompt() | .depends() | .step() | .run()]
+```
+
+**MCP Steps:**
+```
+.step() → .mcp() → .params() → [.depends() | .step() | .run()]
+```
+
+**Key constraints:**
+- After `.prompt()`, you cannot call `.depends()` — call `.depends()` before `.prompt()` if needed
+- After `.mcp()`, you must call `.params()` before `.step()` or `.run()`
+- TypeScript will enforce these constraints at compile time
+
+**Example: Correct ordering**
+```typescript
+// AI step with dependencies - call .depends() before .prompt()
+.step("review")
+.with("anthropic:claude-sonnet-4-5-20250929")
+.depends("extract")                    // Dependencies first
+.prompt("Review the extracted data")   // Prompt last
+
+// MCP step - .params() is required after .mcp()
+.step("lookup")
+.mcp("crm:searchCompany")
+.params({ name: "{{steps.extract.company}}" })
+.depends("extract")
+```
+
 ### Step Config
 
 ```typescript

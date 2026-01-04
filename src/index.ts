@@ -11,14 +11,8 @@
  *
  * const result = await relay
  *   .workflow('invoice-processor')
- *   .step('extract', {
- *     schema: InvoiceSchema,
- *     systemPrompt: 'Extract invoice data'
- *   })
- *   .with('openai:gpt-4.1')
- *   .step('summarize')
- *   .with('anthropic:claude-sonnet-4-5-20250929')
- *   .depends('extract')
+ *   .step('extract').with('openai:gpt-4o').prompt('Extract invoice data from the document')
+ *   .step('summarize').with('anthropic:claude-sonnet-4-20250514').depends('extract')
  *   .run({ fileUrl: 'https://example.com/invoice.pdf' });
  * ```
  */
@@ -89,14 +83,8 @@ export type { WorkflowRunResult } from '@relayplane/engine';
  *
  * const result = await relay
  *   .workflow('invoice-processor')
- *   .step('extract', {
- *     schema: InvoiceSchema,
- *     systemPrompt: 'Extract invoice data'
- *   })
- *   .with('openai:gpt-4.1')
- *   .step('summarize')
- *   .with('anthropic:claude-sonnet-4-5-20250929')
- *   .depends('extract')
+ *   .step('extract').with('openai:gpt-4o').prompt('Extract invoice data from the document')
+ *   .step('summarize').with('anthropic:claude-sonnet-4-20250514').depends('extract')
  *   .run({ fileUrl: 'https://example.com/invoice.pdf' });
  * ```
  */

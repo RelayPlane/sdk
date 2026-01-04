@@ -7,7 +7,11 @@
  * @packageDocumentation
  */
 
-import { TelemetryWorker, TelemetryRun, TelemetryStepLog } from '@relayplane/telemetry';
+// TelemetryWorker is a runtime class - tsup bundles it from @relayplane/telemetry
+import { TelemetryWorker } from '@relayplane/telemetry';
+// TelemetryRun and TelemetryStepLog are types - use local definitions to avoid
+// external references in .d.ts files (users don't have @relayplane/telemetry)
+import type { TelemetryRun, TelemetryStepLog } from './types';
 import type { WorkflowRunResult, StepExecutionLog } from '@relayplane/engine';
 import { randomUUID } from 'crypto';
 
