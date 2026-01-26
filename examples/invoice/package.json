@@ -1,0 +1,24 @@
+{
+  "name": "@relayplane/template-invoice",
+  "version": "0.1.0",
+  "description": "Invoice processing workflow template for RelayPlane",
+  "main": "workflow.ts",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "example": "tsx example.ts"
+  },
+  "keywords": ["invoice", "workflow", "vision", "extraction"],
+  "author": "RelayPlane",
+  "license": "MIT",
+  "dependencies": {
+    "@relayplane/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0",
+    "tsx": "^4.7.0"
+  }
+}
