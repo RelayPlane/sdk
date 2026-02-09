@@ -1,6 +1,6 @@
 {
   "name": "@relayplane/sdk",
-  "version": "1.1.5",
+  "version": "1.1.10",
   "description": "RelayPlane SDK - Local-first AI workflow engine for building multi-step AI workflows",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -64,8 +64,10 @@
       "optional": true
     }
   },
+  "dependencies": {
+    "@relayplane/adapters": "^0.1.5"
+  },
   "devDependencies": {
-    "@relayplane/adapters": "workspace:*",
     "@relayplane/engine": "workspace:*",
     "@relayplane/mcp": "workspace:*",
     "@relayplane/telemetry": "workspace:*",

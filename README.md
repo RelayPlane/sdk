@@ -19,7 +19,7 @@ import { relay } from "@relayplane/sdk";
 const result = await relay
   .workflow("content-pipeline")
   .step("draft")
-  .with("openai:gpt-4.1")
+  .with("openai:gpt-5.2")
   .prompt("Write a blog post about {{input.topic}}")
   .step("review")
   .with("anthropic:claude-sonnet-4-5-20250929")
@@ -36,16 +36,16 @@ That's it. Runs locally with your API keys. No gateway. No surprises.
 
 ```typescript
 // OpenAI
-.with("openai:gpt-4.1")
+.with("openai:gpt-5.2")
 
 // Anthropic
 .with("anthropic:claude-sonnet-4-5-20250929")
 
 // Google
-.with("google:gemini-2.5-flash")
+.with("google:gemini-3-flash")
 
 // xAI
-.with("xai:grok-4")
+.with("xai:grok-beta")
 
 // Local (Ollama)
 .with("local:llama3.3")
@@ -89,7 +89,7 @@ const result = await relay
     schema: InvoiceSchema,
     systemPrompt: "Extract all invoice fields as structured JSON.",
   })
-  .with("openai:gpt-4.1")
+  .with("openai:gpt-5.2")
 
   // Step 2: Validate with a different model
   .step("validate", {
@@ -129,7 +129,7 @@ const result = await relay
 
   // AI step: Extract company name
   .step("extract")
-  .with("openai:gpt-4.1")
+  .with("openai:gpt-5.2")
   .prompt("Extract the company name from: {{input.email}}")
 
   // MCP step: Look up in CRM
@@ -174,7 +174,7 @@ relay.configure({
 ```typescript
 await relay
   .workflow("example")
-  .step("test").with("openai:gpt-4.1")
+  .step("test").with("openai:gpt-5.2")
   .run(input, {
     providers: {
       openai: { apiKey: "sk-override-key" },
@@ -186,10 +186,10 @@ await relay
 
 | Provider | Example Models | Format |
 |----------|----------------|--------|
-| **OpenAI** | GPT-5.2, GPT-4.1, o3 | `openai:gpt-5.2` |
+| **OpenAI** | GPT-5.2, GPT-5-mini, o3-mini | `openai:gpt-5.2` |
 | **Anthropic** | Claude Opus 4.5, Sonnet 4.5, Haiku 4.5 | `anthropic:claude-sonnet-4-5-20250929` |
-| **Google** | Gemini 3 Pro, Gemini 2.5 Flash | `google:gemini-2.5-flash` |
-| **xAI** | Grok 4, Grok 3 Mini | `xai:grok-4` |
+| **Google** | Gemini 3 Pro, Gemini 3 Flash, Gemini 2.5 Flash | `google:gemini-3-flash` |
+| **xAI** | Grok Beta | `xai:grok-beta` |
 | **Perplexity** | Sonar Pro, Sonar Reasoning | `perplexity:sonar-pro` |
 | **Local** | Any Ollama model | `local:llama3.3` |
 
@@ -276,7 +276,7 @@ result.metadata       // { workflowName, startTime, endTime, duration }
 ```typescript
 const result = await relay
   .workflow("example")
-  .step("process").with("openai:gpt-4.1")
+  .step("process").with("openai:gpt-5.2")
   .run(input);
 
 if (!result.success) {
@@ -298,7 +298,7 @@ const UserSchema = z.object({
 const result = await relay
   .workflow("extract-user")
   .step("extract", { schema: UserSchema })
-  .with("openai:gpt-4.1")
+  .with("openai:gpt-5.2")
   .run({ text: "Contact: John at john@example.com" });
 
 // result.steps.extract is typed as { name: string; email: string }
@@ -314,7 +314,7 @@ await relay
   .workflow("daily-report")
   .schedule("0 9 * * *")
   .webhook("https://slack.com/webhook/...")
-  .step("generate").with("openai:gpt-4.1")
+  .step("generate").with("openai:gpt-5.2")
   .run(input);
 ```
 

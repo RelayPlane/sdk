@@ -152,6 +152,8 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
             schema: step.config?.schema,
             dependsOn: step.dependsOn,
             retry: step.config?.retry,
+            // Pass fallback models (already in "provider:model" format)
+            fallbackModels: step.fallbackModels,
             metadata: {
               ...step.config?.metadata,
               provider,
@@ -166,7 +168,7 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
       };
 
       // Create adapter executor
-      const adapterExecutor = createAdapterExecutor(defaultAdapterRegistry, this.buildApiKeys(options));
+      const adapterExecutor = createAdapterExecutor(defaultAdapterRegistry, this.buildProviderConfigs(options));
 
       // Execute workflow
       const engineResult: WorkflowRunResult = await runWorkflow(workflowDef, input || {}, adapterExecutor, {
@@ -342,6 +344,8 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
       schema: step.config?.schema,
       dependsOn: step.dependsOn,
       retry: step.config?.retry,
+      // Pass fallback models (already in "provider:model" format)
+      fallbackModels: step.fallbackModels,
       metadata: {
         ...step.config?.metadata,
         provider,
@@ -353,7 +357,7 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
       steps: [workflowStep],
     };
 
-    const adapterExecutor = createAdapterExecutor(defaultAdapterRegistry, this.buildApiKeys(options));
+    const adapterExecutor = createAdapterExecutor(defaultAdapterRegistry, this.buildProviderConfigs(options));
 
     // Execute with context including previous step outputs
     const context = {
@@ -473,25 +477,29 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
   }
 
   /**
-   * Builds API keys object for adapter executor.
-   * Resolves keys from three-tier resolution strategy.
+   * Builds provider configurations for adapter executor.
+   * Resolves keys and base URLs from three-tier resolution strategy.
    */
-  private buildApiKeys(options?: RunOptions): Record<string, string> {
+  private buildProviderConfigs(options?: RunOptions): Record<string, { apiKey: string; baseUrl?: string }> {
     const providers = this.extractProviders();
-    const apiKeys: Record<string, string> = {};
+    const configs: Record<string, { apiKey: string; baseUrl?: string }> = {};
 
     for (const provider of providers) {
       const config = resolveProviderConfig(provider, options);
       if (config) {
-        apiKeys[provider] = config.apiKey;
+        configs[provider] = {
+          apiKey: config.apiKey,
+          baseUrl: config.baseUrl,
+        };
       }
     }
 
-    return apiKeys;
+    return configs;
   }
 
   /**
    * Extracts unique provider names from AI steps only.
+   * Includes providers from fallback models.
    */
   private extractProviders(): string[] {
     const providers = new Set<string>();
@@ -499,6 +507,14 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
       if (step.type === 'ai' && step.model) {
         const [provider] = this.parseModel(step.model);
         providers.add(provider);
+
+        // Also include providers from fallback models
+        if (step.fallbackModels) {
+          for (const fallbackModel of step.fallbackModels) {
+            const [fallbackProvider] = this.parseModel(fallbackModel);
+            providers.add(fallbackProvider);
+          }
+        }
       }
     }
     return Array.from(providers);
@@ -506,15 +522,18 @@ class WorkflowBuilderImpl<Steps extends StepDefinition[] = []>
 
   /**
    * Parses "provider:model-id" format into [provider, model].
+   * Splits only on the first colon to allow colons in model names (e.g., "local:llama3.2:1b").
    */
   private parseModel(model: string): [string, string] {
-    const parts = model.split(':');
-    if (parts.length !== 2) {
+    const firstColonIndex = model.indexOf(':');
+    if (firstColonIndex === -1) {
       throw new Error(
         `Invalid model format: "${model}". Expected "provider:model-id" (e.g., "openai:gpt-4o")`
       );
     }
-    return [parts[0], parts[1]];
+    const provider = model.substring(0, firstColonIndex);
+    const modelId = model.substring(firstColonIndex + 1);
+    return [provider, modelId];
   }
 
   /**
@@ -624,7 +643,7 @@ class StepWithImpl<Name extends string, Config extends StepConfig, PrevSteps ext
 }
 
 /**
- * Step builder after .with() - can add dependencies, continue building, or run.
+ * Step builder after .with() - can add dependencies, fallbacks, continue building, or run.
  */
 class StepWithModelImpl<
   Name extends string,
@@ -639,7 +658,8 @@ class StepWithModelImpl<
     cloudFeatures: CloudFeatures,
     stepName: Name,
     stepConfig: Config | undefined,
-    model: Model
+    model: Model,
+    fallbackModels: string[] = []
   ) {
     // Add the step immediately when .with() is called
     const newStep: StepDefinition = {
@@ -648,9 +668,37 @@ class StepWithModelImpl<
       model: model,
       config: stepConfig,
       dependsOn: [],
+      fallbackModels: fallbackModels.length > 0 ? fallbackModels : undefined,
     };
 
     super(workflowName, [...steps, newStep], cloudFeatures);
+  }
+
+  /**
+   * Adds a fallback model to try if the primary model fails.
+   * Fallbacks are tried in order after the primary model exhausts its retries.
+   */
+  fallback<FallbackModel extends string>(model: FallbackModel): StepWithModel<Name, Config, Model, PrevSteps> {
+    // Get the current step and add the fallback model
+    const allSteps = [...(this as any).steps];
+    const lastStep = allSteps[allSteps.length - 1];
+
+    if (lastStep) {
+      // Add to existing fallbacks or create new array
+      const existingFallbacks = lastStep.fallbackModels || [];
+      lastStep.fallbackModels = [...existingFallbacks, model];
+    }
+
+    // Return new instance with updated steps (for proper chaining)
+    return new StepWithModelImpl<Name, Config, Model, PrevSteps>(
+      (this as any).workflowName,
+      allSteps.slice(0, -1), // Previous steps (excluding current)
+      (this as any).cloudFeatures,
+      lastStep.name,
+      lastStep.config,
+      lastStep.model,
+      lastStep.fallbackModels || []
+    );
   }
 
   /**

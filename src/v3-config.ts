@@ -14,7 +14,7 @@
  * @packageDocumentation
  */
 
-import type { GlobalConfig, ProviderConfig, RunOptions } from './v3-types';
+import type { GlobalConfig, Policy, ProviderConfig, RunOptions } from './v3-types';
 import { SDKTelemetryClient } from './telemetry/client';
 
 /**
@@ -34,10 +34,9 @@ function readCliConfig(): { accessToken?: string; teamId?: string } | undefined 
   }
 
   try {
-    // Use eval to hide require from bundler static analysis
+    // Use new Function to hide require from bundler static analysis
     // This prevents bundlers from trying to polyfill Node.js built-ins
-    // eslint-disable-next-line no-eval
-    const nodeRequire = eval('require');
+    const nodeRequire = new Function('return require')();
     const fs = nodeRequire('fs');
     const path = nodeRequire('path');
     const os = nodeRequire('os');
@@ -89,6 +88,7 @@ function initTelemetryConfig(): GlobalConfig['telemetry'] {
  */
 let globalConfig: GlobalConfig = {
   providers: {},
+  policies: {},
   telemetry: initTelemetryConfig(),
   cloud: {
     enabled: false,
@@ -137,6 +137,29 @@ const PROVIDER_ENV_VARS: Record<string, string> = {
  * ```
  */
 export function configure(config: GlobalConfig): void {
+  // Validate policies if provided
+  if (config.policies) {
+    for (const [id, policy] of Object.entries(config.policies)) {
+      validatePolicyConfig(id, policy);
+    }
+  }
+
+  // Auto-derive telemetry config from cloud settings if not explicitly provided
+  // This allows users to just set cloud.accessToken and get telemetry automatically
+  let telemetryConfig = config.telemetry;
+  if (!telemetryConfig?.apiKey && config.cloud?.enabled && config.cloud?.accessToken) {
+    const cloudTelemetry = (config.cloud as any)?.telemetry;
+    telemetryConfig = {
+      enabled: cloudTelemetry?.enabled !== false, // Default to enabled if cloud is enabled
+      apiEndpoint: config.cloud.apiEndpoint
+        ? `${config.cloud.apiEndpoint}/v1/telemetry/logs`
+        : 'https://api.relayplane.com/v1/telemetry/logs',
+      apiKey: config.cloud.accessToken,
+      flushInterval: cloudTelemetry?.flushInterval,
+      maxRetries: cloudTelemetry?.maxRetries,
+    };
+  }
+
   // Merge with existing config (shallow merge for top-level properties)
   globalConfig = {
     ...globalConfig,
@@ -145,6 +168,12 @@ export function configure(config: GlobalConfig): void {
       ...globalConfig.providers,
       ...config.providers,
     },
+    policies: {
+      ...globalConfig.policies,
+      ...config.policies,
+    },
+    // Use derived telemetry config if available
+    telemetry: telemetryConfig || globalConfig.telemetry,
   };
 }
 
@@ -165,6 +194,7 @@ export function getConfig(): Readonly<GlobalConfig> {
 export function resetConfig(): void {
   globalConfig = {
     providers: {},
+    policies: {},
     telemetry: {
       enabled: false,
     },
@@ -172,6 +202,110 @@ export function resetConfig(): void {
       enabled: false,
     },
   };
+}
+
+// ============================================================================
+// Policy Management
+// ============================================================================
+
+/**
+ * Validates a policy configuration.
+ * Throws an error if the policy is invalid.
+ *
+ * @param id - Policy ID (for error messages)
+ * @param policy - Policy configuration to validate
+ * @throws Error if policy is invalid
+ */
+function validatePolicyConfig(id: string, policy: Policy): void {
+  if (!policy.model) {
+    throw new Error(`Policy "${id}" must specify a model (e.g., "openai:gpt-4o")`);
+  }
+
+  // Validate model format (provider:model)
+  if (!policy.model.includes(':')) {
+    throw new Error(
+      `Policy "${id}" model must be in format "provider:model" (got "${policy.model}")`
+    );
+  }
+
+  // Validate fallback format if provided
+  if (policy.fallback) {
+    for (const fallback of policy.fallback) {
+      if (!fallback.includes(':')) {
+        throw new Error(
+          `Policy "${id}" fallback must be in format "provider:model" (got "${fallback}")`
+        );
+      }
+    }
+  }
+
+  // Validate cost caps if provided
+  if (policy.costCaps) {
+    if (policy.costCaps.maxCostPerExecution !== undefined && policy.costCaps.maxCostPerExecution < 0) {
+      throw new Error(`Policy "${id}" maxCostPerExecution must be non-negative`);
+    }
+    if (policy.costCaps.maxTokensPerExecution !== undefined && policy.costCaps.maxTokensPerExecution < 1) {
+      throw new Error(`Policy "${id}" maxTokensPerExecution must be at least 1`);
+    }
+  }
+
+  // Validate temperature if provided
+  if (policy.temperature !== undefined && (policy.temperature < 0 || policy.temperature > 2)) {
+    throw new Error(`Policy "${id}" temperature must be between 0 and 2`);
+  }
+}
+
+/**
+ * Gets a policy by ID.
+ *
+ * @param policyId - The policy ID to retrieve
+ * @returns The policy configuration or undefined if not found
+ *
+ * @example
+ * ```typescript
+ * const policy = getPolicy('fast-analysis');
+ * if (!policy) {
+ *   throw new Error('Policy not found');
+ * }
+ * console.log(policy.model); // 'openai:gpt-4o'
+ * ```
+ */
+export function getPolicy(policyId: string): Policy | undefined {
+  return globalConfig.policies?.[policyId];
+}
+
+/**
+ * Lists all configured policy IDs.
+ *
+ * @returns Array of policy IDs
+ *
+ * @example
+ * ```typescript
+ * const policyIds = listPolicies();
+ * console.log(policyIds); // ['fast-analysis', 'deep-reasoning', 'cost-efficient']
+ * ```
+ */
+export function listPolicies(): string[] {
+  return Object.keys(globalConfig.policies || {});
+}
+
+/**
+ * Gets all configured policies with their full configurations.
+ *
+ * @returns Record of policy ID to policy configuration
+ */
+export function getAllPolicies(): Record<string, Policy> {
+  return { ...globalConfig.policies };
+}
+
+/**
+ * Checks if a policy exists.
+ *
+ * @param policyId - The policy ID to check
+ * @returns True if the policy exists
+ */
+export function hasPolicy(policyId: string): boolean {
+  return policyId in (globalConfig.policies || {});
 }
 
 /**
@@ -222,6 +356,11 @@ export function resolveProviderConfig(
 }
 
 /**
+ * Providers that don't require an API key (local LLMs).
+ */
+const KEYLESS_PROVIDERS = new Set(['local']);
+
+/**
  * Checks if a provider is configured.
  * Useful for validation before workflow execution.
  *
@@ -230,6 +369,11 @@ export function resolveProviderConfig(
  * @returns True if provider has a valid configuration
  */
 export function isProviderConfigured(provider: string, runOptions?: RunOptions): boolean {
+  // Local providers (Ollama) don't require an API key - they're always "configured"
+  if (KEYLESS_PROVIDERS.has(provider)) {
+    return true;
+  }
+
   const config = resolveProviderConfig(provider, runOptions);
   return config !== undefined && config.apiKey !== undefined && config.apiKey !== '';
 }

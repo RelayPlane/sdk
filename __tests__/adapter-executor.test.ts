@@ -12,7 +12,7 @@ import type { ModelAdapter, AdapterResult } from '@relayplane/engine';
 describe('SDKAdapterExecutor', () => {
   let registry: AdapterRegistry;
   let mockAdapter: ModelAdapter;
-  let apiKeys: Record<string, string>;
+  let configs: Record<string, { apiKey: string; baseUrl?: string }>;
 
   beforeEach(() => {
     registry = new AdapterRegistry();
@@ -25,21 +25,21 @@ describe('SDKAdapterExecutor', () => {
         tokensOut: 20,
       } as AdapterResult),
     };
-    apiKeys = {
-      openai: 'sk-test-key',
-      anthropic: 'sk-ant-test-key',
+    configs = {
+      openai: { apiKey: 'sk-test-key' },
+      anthropic: { apiKey: 'sk-ant-test-key' },
     };
   });
 
   describe('Basic Execution', () => {
     it('should create executor', () => {
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
 
       expect(executor).toBeDefined();
     });
 
     it('should create adapter executor function', () => {
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       expect(typeof adapterExecutor).toBe('function');
@@ -48,7 +48,7 @@ describe('SDKAdapterExecutor', () => {
     it('should execute with valid adapter', async () => {
       registry.register('openai', mockAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -71,7 +71,7 @@ describe('SDKAdapterExecutor', () => {
     it('should pass schema to adapter', async () => {
       registry.register('openai', mockAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const schema = {
@@ -98,7 +98,7 @@ describe('SDKAdapterExecutor', () => {
 
   describe('Error Handling', () => {
     it('should return error if provider not in metadata', async () => {
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -114,7 +114,7 @@ describe('SDKAdapterExecutor', () => {
     });
 
     it('should return error if adapter not registered', async () => {
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -132,7 +132,7 @@ describe('SDKAdapterExecutor', () => {
     it('should return error if API key not provided', async () => {
       registry.register('google', mockAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, { openai: 'key' });
+      const executor = new SDKAdapterExecutor(registry, { openai: { apiKey: 'key' } });
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -144,7 +144,7 @@ describe('SDKAdapterExecutor', () => {
 
       expect(result.success).toBe(false);
       expect(result.error?.type).toBe('ValidationError');
-      expect(result.error?.message).toContain('No API key provided');
+      expect(result.error?.message).toContain('No configuration provided');
     });
 
     it('should handle adapter throwing error', async () => {
@@ -154,7 +154,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', throwingAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -177,7 +177,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', errorAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -199,7 +199,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', errorAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -221,7 +221,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', errorAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -243,7 +243,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', errorAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -265,7 +265,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', errorAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -291,7 +291,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', errorAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -329,7 +329,7 @@ describe('SDKAdapterExecutor', () => {
       registry.register('openai', openaiAdapter);
       registry.register('anthropic', anthropicAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       // Execute with OpenAI
@@ -361,8 +361,8 @@ describe('SDKAdapterExecutor', () => {
       registry.register('anthropic', mockAdapter);
 
       const executor = new SDKAdapterExecutor(registry, {
-        openai: 'openai-key',
-        anthropic: 'anthropic-key',
+        openai: { apiKey: 'openai-key' },
+        anthropic: { apiKey: 'anthropic-key' },
       });
       const adapterExecutor = executor.createExecutor();
 
@@ -400,7 +400,7 @@ describe('SDKAdapterExecutor', () => {
     it('should create executor via helper function', () => {
       registry.register('openai', mockAdapter);
 
-      const adapterExecutor = createAdapterExecutor(registry, apiKeys);
+      const adapterExecutor = createAdapterExecutor(registry, configs);
 
       expect(typeof adapterExecutor).toBe('function');
     });
@@ -408,7 +408,7 @@ describe('SDKAdapterExecutor', () => {
     it('should execute via helper function', async () => {
       registry.register('openai', mockAdapter);
 
-      const adapterExecutor = createAdapterExecutor(registry, apiKeys);
+      const adapterExecutor = createAdapterExecutor(registry, configs);
 
       const result = await adapterExecutor({
         model: 'gpt-4o',
@@ -423,7 +423,7 @@ describe('SDKAdapterExecutor', () => {
 
   describe('Duration Tracking', () => {
     it('should track duration for validation errors', async () => {
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({
@@ -443,7 +443,7 @@ describe('SDKAdapterExecutor', () => {
 
       registry.register('openai', errorAdapter);
 
-      const executor = new SDKAdapterExecutor(registry, apiKeys);
+      const executor = new SDKAdapterExecutor(registry, configs);
       const adapterExecutor = executor.createExecutor();
 
       const result = await adapterExecutor({

@@ -22,10 +22,11 @@
 // ============================================================================
 
 import { createWorkflow } from './v3-builder';
-import { configure, getConfig, resetConfig } from './v3-config';
+import { configure, getConfig, resetConfig, getPolicy, listPolicies, getAllPolicies, hasPolicy } from './v3-config';
 import { useRemote, saveRemote, deleteRemote } from './v3-remote';
 import { kv } from './v3-kv';
 import { backup } from './v3-backup';
+import { execute } from './v3-policy';
 
 // Re-export v3 types
 export type {
@@ -43,10 +44,32 @@ export type {
   MCPServerConfig,
   GlobalConfig,
   CloudFeatures,
+  Policy,
+  PolicyExecuteInput,
+  PolicyExecuteResult,
 } from './v3-types';
 
 // Re-export config functions
 export { configure, getConfig, resetConfig };
+
+// Re-export error types
+export {
+  RelayPlaneError,
+  RelayPlaneErrorCode,
+  isRelayPlaneError,
+  providerNotConfiguredError,
+  policyNotFoundError,
+  costCapExceededError,
+  circularDependencyError,
+  stepFailedError,
+  timeoutError,
+  fromUnknownError,
+} from './errors';
+export type { RelayPlaneErrorPayload } from './errors';
+
+// Re-export policy functions
+export { getPolicy, listPolicies, getAllPolicies, hasPolicy } from './v3-config';
+export { execute, getPolicyDetails } from './v3-policy';
 
 // Re-export KV store
 export { kv } from './v3-kv';
@@ -206,6 +229,75 @@ export const relay = {
    * ```
    */
   backup,
+
+  /**
+   * Executes a prompt using a pre-configured policy.
+   *
+   * Policies provide standardized execution patterns with:
+   * - Primary model selection
+   * - Automatic fallback on failure
+   * - Cost controls and limits
+   * - Retry configuration
+   *
+   * @param policyId - ID of the policy to use
+   * @param input - Execution input (prompt, variables, schema)
+   * @returns Execution result with output and metadata
+   *
+   * @example
+   * ```typescript
+   * // Configure policies
+   * relay.configure({
+   *   providers: {
+   *     openai: { apiKey: process.env.OPENAI_API_KEY! }
+   *   },
+   *   policies: {
+   *     'fast-analysis': {
+   *       id: 'fast-analysis',
+   *       model: 'openai:gpt-4o',
+   *       fallback: ['anthropic:claude-sonnet-4-20250514'],
+   *       costCaps: { maxCostPerExecution: 0.10 }
+   *     }
+   *   }
+   * });
+   *
+   * // Execute using policy
+   * const result = await relay.execute('fast-analysis', {
+   *   prompt: 'Analyze this text: {{text}}',
+   *   variables: { text: 'Hello world' }
+   * });
+   * ```
+   */
+  execute,
+
+  /**
+   * Gets a policy by ID.
+   *
+   * @param policyId - The policy ID
+   * @returns Policy configuration or undefined
+   */
+  getPolicy,
+
+  /**
+   * Lists all configured policy IDs.
+   *
+   * @returns Array of policy IDs
+   */
+  listPolicies,
+
+  /**
+   * Gets all configured policies.
+   *
+   * @returns Record of policy ID to configuration
+   */
+  getAllPolicies,
+
+  /**
+   * Checks if a policy exists.
+   *
+   * @param policyId - The policy ID to check
+   * @returns True if policy exists
+   */
+  hasPolicy,
 };
 
 /**

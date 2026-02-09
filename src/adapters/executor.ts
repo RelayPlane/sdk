@@ -9,6 +9,12 @@
 
 import type { AdapterExecutor, AdapterExecuteArgs, AdapterResult } from '@relayplane/engine';
 import type { IAdapterRegistry } from '@relayplane/adapters';
+import { MissingPeerDependencyError } from '@relayplane/adapters';
+
+/**
+ * Providers that don't require an API key (local LLMs).
+ */
+const KEYLESS_PROVIDERS = new Set(['local']);
 
 /**
  * SDK Adapter Executor
@@ -40,19 +46,22 @@ export class SDKAdapterExecutor {
   private registry: IAdapterRegistry;
 
   /**
-   * API keys for each provider.
+   * Configuration for each provider (API keys, base URLs, etc).
    */
-  private apiKeys: Record<string, string>;
+  private configs: Record<string, { apiKey: string; baseUrl?: string }>;
 
   /**
    * Creates a new SDKAdapterExecutor.
    *
    * @param registry - Adapter registry
-   * @param apiKeys - Provider API keys
+   * @param configs - Provider configurations
    */
-  constructor(registry: IAdapterRegistry, apiKeys: Record<string, string>) {
+  constructor(
+    registry: IAdapterRegistry,
+    configs: Record<string, { apiKey: string; baseUrl?: string }>
+  ) {
     this.registry = registry;
-    this.apiKeys = apiKeys;
+    this.configs = configs;
   }
 
   /**
@@ -98,30 +107,62 @@ export class SDKAdapterExecutor {
       };
     }
 
-    // Check if adapter is registered
-    const adapter = this.registry.get(provider);
+    // Check if adapter is registered (await for ESM-compatible lazy loading)
+    let adapter;
+    try {
+      adapter = await this.registry.get(provider);
+    } catch (error) {
+      // Handle missing peer dependency error with helpful message
+      if (error instanceof MissingPeerDependencyError) {
+        return {
+          success: false,
+          error: {
+            type: 'MissingDependencyError',
+            message: error.message,
+          },
+          durationMs: Date.now() - startTime,
+        };
+      }
+      throw error;
+    }
     if (!adapter) {
       return {
         success: false,
         error: {
           type: 'ValidationError',
-          message: `No adapter registered for provider: ${provider}`,
+          message: `No adapter registered for provider: ${provider}. Supported providers: openai, anthropic, google, xai, local`,
         },
         durationMs: Date.now() - startTime,
       };
     }
 
-    // Check if API key is provided
-    const apiKey = this.apiKeys[provider];
-    if (!apiKey) {
-      return {
-        success: false,
-        error: {
-          type: 'ValidationError',
-          message: `No API key provided for provider: ${provider}`,
-        },
-        durationMs: Date.now() - startTime,
-      };
+    // Check if config is provided (keyless providers like 'local' don't need API key)
+    const config = this.configs[provider];
+    const isKeylessProvider = KEYLESS_PROVIDERS.has(provider);
+
+    // Keyless providers (like Ollama) don't need any configuration
+    if (!isKeylessProvider) {
+      if (!config) {
+        return {
+          success: false,
+          error: {
+            type: 'ValidationError',
+            message: `No configuration provided for provider: ${provider}`,
+          },
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      if (!config.apiKey) {
+        return {
+          success: false,
+          error: {
+            type: 'ValidationError',
+            message: `No API key provided for provider: ${provider}`,
+          },
+          durationMs: Date.now() - startTime,
+        };
+      }
     }
 
     // Execute via adapter
@@ -130,7 +171,8 @@ export class SDKAdapterExecutor {
         model: args.model,
         input: args.input,
         schema: args.schema,
-        apiKey,
+        apiKey: config?.apiKey ?? '',
+        baseUrl: config?.baseUrl,
       });
 
       // Adapters should never throw, but wrap just in case
@@ -219,24 +261,24 @@ export class SDKAdapterExecutor {
 }
 
 /**
- * Creates an adapter executor from a registry and API keys.
+ * Creates an adapter executor from a registry and configurations.
  * Convenience function for common use case.
  *
  * @param registry - Adapter registry
- * @param apiKeys - Provider API keys
+ * @param configs - Provider configurations (API keys, base URLs)
  * @returns AdapterExecutor function
  *
  * @example
  * ```typescript
  * const executor = createAdapterExecutor(registry, {
- *   openai: process.env.OPENAI_API_KEY
+ *   openai: { apiKey: process.env.OPENAI_API_KEY }
  * });
  * ```
  */
 export function createAdapterExecutor(
   registry: IAdapterRegistry,
-  apiKeys: Record<string, string>
+  configs: Record<string, { apiKey: string; baseUrl?: string }>
 ): AdapterExecutor {
-  const sdkExecutor = new SDKAdapterExecutor(registry, apiKeys);
+  const sdkExecutor = new SDKAdapterExecutor(registry, configs);
   return sdkExecutor.createExecutor();
 }

@@ -82,6 +82,13 @@ export interface StepDefinition {
 
   /** Dependencies (step names this step depends on) */
   dependsOn: string[];
+
+  /**
+   * Fallback models to try if the primary model fails.
+   * Each model gets its own retry attempts before moving to the next.
+   * Format: "provider:model-id"
+   */
+  fallbackModels?: string[];
 }
 
 /**
@@ -253,7 +260,7 @@ export interface StepWith<Name extends string, Config extends StepConfig, PrevSt
 }
 
 /**
- * Step builder after .with() - can add dependencies, continue building, or run.
+ * Step builder after .with() - can add dependencies, fallbacks, continue building, or run.
  *
  * @template Name - Step name
  * @template Config - Step configuration
@@ -302,6 +309,23 @@ export interface StepWithModel<
   depends<Deps extends PrevSteps[number]['name']>(
     ...deps: Deps[]
   ): StepComplete<AppendStep<PrevSteps, { name: Name; type: 'ai'; model: Model; config: Config; dependsOn: Deps[] }>>;
+
+  /**
+   * Adds a fallback model to try if the primary model fails.
+   * Fallbacks are tried in order after the primary model exhausts its retries.
+   * Can be chained to add multiple fallbacks.
+   *
+   * @param model - Fallback model in "provider:model-id" format
+   * @returns This builder for chaining
+   *
+   * @example
+   * ```typescript
+   * .with("openai:gpt-4o")
+   * .fallback("anthropic:claude-sonnet-4-20250514")
+   * .fallback("openai:gpt-4o-mini")
+   * ```
+   */
+  fallback<FallbackModel extends string>(model: FallbackModel): StepWithModel<Name, Config, Model, PrevSteps>;
 }
 
 /**
@@ -455,11 +479,121 @@ export interface MCPServerConfig {
 }
 
 /**
+ * Policy definition for standardized AI execution patterns.
+ * Policies encapsulate model selection, fallback behavior, and cost controls.
+ */
+export interface Policy {
+  /** Unique identifier for this policy */
+  id: string;
+
+  /** Human-readable name for the policy */
+  name?: string;
+
+  /** Description of what this policy is for */
+  description?: string;
+
+  /** Primary model to use (format: provider:model) */
+  model: string;
+
+  /** Fallback models if primary fails (in order of preference) */
+  fallback?: string[];
+
+  /** System prompt to use with this policy */
+  systemPrompt?: string;
+
+  /** Maximum tokens to generate */
+  maxTokens?: number;
+
+  /** Temperature for generation (0-2) */
+  temperature?: number;
+
+  /** Cost controls for this policy */
+  costCaps?: {
+    /** Maximum cost per execution in USD */
+    maxCostPerExecution?: number;
+    /** Maximum total tokens per execution */
+    maxTokensPerExecution?: number;
+    /** Maximum retries before giving up */
+    maxRetries?: number;
+  };
+
+  /** Retry configuration */
+  retry?: {
+    /** Maximum number of retry attempts */
+    maxAttempts?: number;
+    /** Initial delay in milliseconds */
+    delayMs?: number;
+    /** Backoff multiplier for exponential backoff */
+    backoffMultiplier?: number;
+  };
+
+  /** Optional metadata for tracking and analytics */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Input for policy execution.
+ */
+export interface PolicyExecuteInput {
+  /** The prompt to execute */
+  prompt: string;
+
+  /** Optional variables to interpolate into the prompt */
+  variables?: Record<string, unknown>;
+
+  /** Optional schema for structured output (Zod schema) */
+  schema?: unknown;
+
+  /** Override system prompt for this execution */
+  systemPrompt?: string;
+}
+
+/**
+ * Result of policy execution.
+ */
+export interface PolicyExecuteResult {
+  /** Whether execution succeeded */
+  success: boolean;
+
+  /** The output from the model */
+  output?: unknown;
+
+  /** Error message if failed */
+  error?: string;
+
+  /** Which model was actually used (may differ from primary if fallback triggered) */
+  model: string;
+
+  /** Whether a fallback was used */
+  usedFallback: boolean;
+
+  /** The policy ID that was executed */
+  policyId: string;
+
+  /** Execution metadata */
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    estimatedCostUsd: number;
+  };
+
+  /** Duration in milliseconds */
+  durationMs: number;
+
+  /** Run ID for tracing */
+  runId: string;
+}
+
+/**
  * Global configuration for the RelayPlane SDK.
  */
 export interface GlobalConfig {
   /** Provider configurations (API keys, base URLs) */
   providers?: Record<string, ProviderConfig>;
+
+  /** Policy definitions for standardized execution patterns */
+  policies?: Record<string, Policy>;
 
   /** MCP server configurations */
   mcp?: {

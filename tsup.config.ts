@@ -8,11 +8,12 @@ const commonOptions: Options = {
   shims: false, // Disable shims to avoid createRequire in browser
   noExternal: [
     '@relayplane/engine',
-    '@relayplane/adapters',
     '@relayplane/telemetry',
     '@relayplane/mcp'
   ],
   external: [
+    // Keep adapters external for ESM-compatible lazy loading
+    '@relayplane/adapters',
     '@anthropic-ai/sdk',
     '@google/generative-ai',
     'openai',
